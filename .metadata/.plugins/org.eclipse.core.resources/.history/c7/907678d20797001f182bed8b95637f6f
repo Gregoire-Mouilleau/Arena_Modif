@@ -1,0 +1,88 @@
+package fr.ariloxe.arena.kits.release;
+
+import fr.ariloxe.arena.kits.KitSchedule;
+import fr.ariloxe.arena.kits.KitType;
+import fr.ariloxe.arena.player.KPlayer;
+import fr.ariloxe.arena.utils.ItemCreator;
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scheduler.BukkitRunnable;
+
+import fr.ariloxe.arena.ArenaAPI;
+
+public class ErenKit extends KitSchedule {
+
+    private final PotionEffect resistanceEffect = new PotionEffect(PotionEffectType.DAMAGE_RESISTANCE, 20 * 20, 0, false, false);
+    private final PotionEffect forceEffect = new PotionEffect(PotionEffectType.INCREASE_DAMAGE, 23 * 20, 0, false, false);
+    private final PotionEffect slownessEffect = new PotionEffect(PotionEffectType.SLOW, 20, 200, false, false);
+    private final PotionEffect jumpEffect = new PotionEffect(PotionEffectType.JUMP, 2 * 20, 240, false, false);
+    private boolean inTransformation = false;
+
+    public ErenKit() {
+        super("Eren Jeager", KitType.DPS, new ItemStack(Material.DEAD_BUSH),
+                "§8» §7Mode : §eAOTv3",
+                "§8» §7Pouvoirs:",
+                "§f- §7Forme Défensive : Résistance 1 pendant 20s + 2 cœurs temporaires.",
+                "§f- §7Forme Offensive : Force 1 pendant 23s, paralyse les joueurs proches pendant 1s.",
+                "§f- §7Les transformations partagent un cooldown de 48s.");
+
+        super.setSecondsDelay(48);
+    }
+
+    @Override
+    public void power(KPlayer kPlayer) {
+        Player player = kPlayer.getBukkitPlayer();
+        if (player != null && !inTransformation) {
+            inTransformation = true;
+
+            // Choix de la transformation
+            ItemStack defensiveForm = new ItemCreator(Material.IRON_DOOR).name("§aForme Défensive §8§l▪ §7Clic-droit").get();
+            ItemStack offensiveForm = new ItemCreator(Material.IRON_SWORD).name("§aForme Offensive §8§l▪ §7Clic-droit").get();
+            player.getInventory().addItem(defensiveForm, offensiveForm);
+        }
+    }
+
+    // Méthode pour activer la forme offensive
+    public void activateOffensiveForm(Player player) {
+        player.addPotionEffect(forceEffect);
+        player.setHealth(Math.min(player.getHealth() + 4, player.getMaxHealth())); // Soigne de 2 cœurs
+        Bukkit.getOnlinePlayers().stream()
+                .filter(target -> target != player && target.getLocation().distance(player.getLocation()) <= 10)
+                .forEach(target -> target.addPotionEffect(slownessEffect));
+        
+        player.sendMessage("§cVous avez activé la forme offensive !");
+        scheduleTransformationEnd(player);
+    }
+
+    // Méthode pour activer la forme défensive
+    public void activateDefensiveForm(Player player) {
+        player.addPotionEffect(resistanceEffect);
+        player.setHealth(Math.min(player.getHealth() + 4, player.getMaxHealth())); // Soigne de 2 cœurs
+        player.sendMessage("§aVous avez activé la forme défensive !");
+        scheduleTransformationEnd(player);
+    }
+
+    // Méthode de fin de transformation pour réinitialiser les effets et l'état
+    private void scheduleTransformationEnd(Player player) {
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                inTransformation = false;
+                player.removePotionEffect(PotionEffectType.DAMAGE_RESISTANCE);
+                player.removePotionEffect(PotionEffectType.INCREASE_DAMAGE);
+                player.getInventory().remove(Material.IRON_DOOR);
+                player.getInventory().remove(Material.IRON_SWORD);
+                player.sendMessage("§cVotre transformation est terminée !");
+            }
+        }.runTaskLater(ArenaAPI.getApi(), 20 * 20); // Transformation dure 20 secondes
+    }
+
+    @Override
+    public void onEquip(Player player) {
+        player.getInventory().addItem(new ItemCreator(Material.DEAD_BUSH).name("§aForme Offensive §8§l▪ §7Clic-droit").get());
+    }
+}

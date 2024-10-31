@@ -1,0 +1,55 @@
+package fr.ariloxe.arena.kits.release;
+
+import fr.ariloxe.arena.utils.ItemCreator;
+import fr.ariloxe.arena.kits.Kit;
+import fr.ariloxe.arena.kits.KitType;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+
+/**
+ * @author Ariloxe
+ */
+public class AkazaKit extends Kit {
+    public AkazaKit() {
+        super("Akaza", KitType.TANK, new ItemStack(Material.TRIPWIRE_HOOK),
+                "§8» §7Mode : §3Démon-Slayer",
+                "§8» §7Pouvoirs:",
+                "§f- §7Vous pouvez voir la vie des joueurs.",
+                "§f- §7Vous avez un item pour obtenir Force I et Résistance I pendant 20 secondes.",
+                "");
+    }
+
+    @Override
+    public void onEquip(Player player) {
+        player.setMaxHealth(20);
+        player.setHealth(player.getMaxHealth());
+
+        ItemStack powerItem = new ItemCreator(Material.BLAZE_POWDER)
+                .name(ChatColor.RED + "Pouvoir Démoniaque")
+                .lore(ChatColor.GRAY + "Utilisez ceci pour obtenir", ChatColor.GRAY + "Force I et Résistance I pendant 20 secondes.")
+                .get();
+        
+        player.getInventory().addItem(powerItem);
+
+        for (Player target : Bukkit.getOnlinePlayers()) {
+            target.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
+            target.setCustomName(ChatColor.RED + target.getName() + ChatColor.GREEN + " (" + (int) target.getHealth() + " HP)");
+            target.setCustomNameVisible(true);
+        }
+    }
+
+    @Override
+    public void onItemUse(Player player, ItemStack item) {
+        if (item.getType() == Material.BLAZE_POWDER) {
+            player.addPotionEffect(new PotionEffect(PotionEffectType.INCREASE_DAMAGE, 20 * 20, 0));
+            player.addPotionEffect(new PotionEffect(PotionEffectType.DAMAGE_RESISTANCE, 20 * 20, 0));
+
+            player.getInventory().remove(item);
+        }
+    }
+}

@@ -1,0 +1,89 @@
+package fr.ariloxe.arena.kits.release;
+
+import fr.ariloxe.arena.ArenaAPI;
+import fr.ariloxe.arena.kits.Kit;
+import fr.ariloxe.arena.kits.KitType;
+import fr.ariloxe.arena.player.KPlayer;
+import fr.ariloxe.arena.utils.ItemCreator;
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scheduler.BukkitRunnable;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class LoupGarouBlancKit extends Kit implements Listener {
+    private final Map<KPlayer, Integer> cooldowns = new HashMap<>();
+    private static final int COOLDOWN_TIME = 35;
+
+    public LoupGarouBlancKit() {
+        super("Kit de Loup-Garou Blanc", KitType.TANK, new ItemStack(Material.REDSTONE),
+                "§8» §7Mode : §9Loup-Garou UHC",
+                "§8» §7Pouvoirs:",
+                "§f- §7Vous possédez 15 coeurs",
+                "§f- §c§lNéanmoins§7, seul votre plastron et vos bottes seront en diamant.");
+
+        // Register the event listener
+        Bukkit.getPluginManager().registerEvents(this, ArenaAPI.getApi());
+    }
+
+    @Override
+    public void onEquip(Player player) {
+        player.setMaxHealth(30);
+        player.setHealth(player.getMaxHealth());
+        player.getInventory().setHelmet(new ItemCreator(Material.DIAMOND_HELMET).unbreakable(true).enchant(Enchantment.PROTECTION_ENVIRONMENTAL, 2).get());
+        player.getInventory().setBoots(new ItemCreator(Material.DIAMOND_BOOTS).unbreakable(true).enchant(Enchantment.PROTECTION_ENVIRONMENTAL, 2).get());
+        player.getInventory().addItem(new ItemCreator(Material.NETHER_STAR).name("§3The Night §8§l▪ §7Clic-droit").get());
+    }
+
+    @EventHandler
+    public void onPlayerInteract(PlayerInteractEvent event) {
+        Player player = event.getPlayer();
+        KPlayer kPlayer = ArenaAPI.getkPlayer(player);
+
+        if (kPlayer != null && cooldowns.containsKey(kPlayer)) {
+            player.sendMessage("§3§lMenestis §f» §7Merci d'attendre §c" + cooldowns.get(kPlayer) + " §7secondes.");
+            return;
+        }
+
+        if (event.getItem() != null && event.getItem().getType() == Material.NETHER_STAR) {
+            useAbility(kPlayer, player);
+        }
+    }
+
+    private void useAbility(KPlayer kPlayer, Player player) {
+        player.addPotionEffect(new PotionEffect(PotionEffectType.INCREASE_DAMAGE, 15 * 20, 0, false, false));
+
+        // Start cooldown
+        cooldowns.put(kPlayer, COOLDOWN_TIME);
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                int remaining = cooldowns.get(kPlayer) - 1;
+                if (remaining <= 0) {
+                    cooldowns.remove(kPlayer);
+                    player.sendMessage("§3§lMenestis §f» §aVous pouvez de nouveau utiliser le pouvoir du kit Loup-Garou Blanc !");
+                    cancel();
+                } else {
+                    cooldowns.put(kPlayer, remaining);
+                }
+            }
+        }.runTaskTimer(ArenaAPI.getApi(), 0, 20);
+
+        // Message pour indiquer l'activation du pouvoir
+        player.sendMessage("§3§lMenestis §f» §aVous avez activé le pouvoir du Loup-Garou Blanc !");
+    }
+}
+
+// Exemple d'ajout du kit à une liste de kits
+List<Kit> kits = new ArrayList<>();
+kits.add(new LoupGarouBlancKit());

@@ -1,0 +1,66 @@
+package fr.ariloxe.arena.kits.release;
+
+import fr.ariloxe.arena.utils.ItemCreator;
+import fr.ariloxe.arena.kits.KitSchedule;
+import fr.ariloxe.arena.kits.KitType;
+import fr.ariloxe.arena.player.KPlayer;
+import org.bukkit.Material;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Player;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+import org.bukkit.util.Vector;
+
+import java.util.Optional;
+
+/**
+ * @author Ariloxe
+ */
+public class GyomeiKit extends KitSchedule {
+    public GyomeiKit() {
+        super("Gyomei", KitType.DPS, new ItemStack(Material.STONE_AXE),
+                "§8» §7Mode : §3Démon-Slayer",
+                "§8» §7Pouvoirs:",
+                "§f- §7En utilisant votre hache, vous pouvez téléporter un ennemi proche",
+                "    §7à vous, jusqu'à 15 blocs de distance. L'ennemi reçoit l'effet de",
+                "    §anausée§7 pendant §b5 secondes§7.",
+                "§f- §7Vous avez §fRésistance I§7 en permanence et 12 cœurs de vie."
+        );
+        super.setSecondsDelay(42);
+    }
+
+    private final int MAX_TELEPORT_RANGE = 15;
+    private final PotionEffect nauseaEffect = new PotionEffect(PotionEffectType.CONFUSION, 20 * 5, 0, false, false);
+    private final PotionEffect permanentResistanceEffect = new PotionEffect(PotionEffectType.DAMAGE_RESISTANCE, Integer.MAX_VALUE, 0, false, false);
+
+    @Override
+    public void power(KPlayer kPlayer) {
+        Player player = kPlayer.getBukkitPlayer();
+
+        if (player != null) {
+            Optional<Player> target = findTargetPlayer(player);
+            target.ifPresent(t -> {
+                t.teleport(player.getLocation());
+                t.addPotionEffect(nauseaEffect);
+            });
+        }
+    }
+
+    // Cherche le joueur cible dans la range de 15 blocs
+    private Optional<Player> findTargetPlayer(Player player) {
+        return player.getNearbyEntities(MAX_TELEPORT_RANGE, MAX_TELEPORT_RANGE, MAX_TELEPORT_RANGE).stream()
+                .filter(entity -> entity instanceof Player)
+                .map(entity -> (Player) entity)
+                .min((p1, p2) -> Double.compare(p1.getLocation().distance(player.getLocation()), p2.getLocation().distance(player.getLocation())));
+    }
+
+    @Override
+    public void onEquip(Player player) {
+        player.getInventory().addItem(new ItemCreator(Material.STONE_AXE).name("§8Téléportation §8§l▪ §7Clic-droit").get());
+        player.addPotionEffect(permanentResistanceEffect);
+        player.setMaxHealth(24.0);  // 12 cœurs
+        player.setHealth(24.0);     // Régler la santé actuelle au maximum (12 cœurs)
+    }
+}

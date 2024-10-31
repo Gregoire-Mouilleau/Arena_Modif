@@ -1,0 +1,103 @@
+package fr.ariloxe.arena.kits.release;
+
+import fr.ariloxe.arena.kits.KitSchedule;
+import fr.ariloxe.arena.kits.KitType;
+import fr.ariloxe.arena.player.KPlayer;
+import fr.ariloxe.arena.utils.ItemCreator;
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scheduler.BukkitRunnable;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+public class ErenKit extends KitSchedule {
+
+    private static final int TRANSFORMATION_DURATION = 20 * 20; // 20 secondes en ticks
+    private static final int COOLDOWN_DURATION = 45; // 45 secondes de cooldown
+    private final Map<UUID, Long> cooldowns = new HashMap<>();
+
+    public ErenKit() {
+        super("Eren Jeager", KitType.DPS, new ItemStack(Material.DEAD_BUSH),
+                "§8» §7Mode : §eAOTv3",
+                "§8» §7Pouvoirs:",
+                "§f- §7Choisissez entre une §cForme Défensive§7 et une §6Forme d'Attaque§7.",
+                "§8» §7Cooldown de 45 secondes entre les transformations.");
+    }
+
+    @Override
+    public void onEquip(Player player) {
+        // Ajout des deux items de transformation dans l'inventaire du joueur
+        player.getInventory().addItem(new ItemCreator(Material.BLAZE_ROD).name("§aForme Défensive §8§l▪ §7Clic-droit").get());
+        player.getInventory().addItem(new ItemCreator(Material.IRON_SWORD).name("§cForme d'Attaque §8§l▪ §7Clic-droit").get());
+    }
+
+    // Forme Défensive
+    public void activateDefensiveForm(KPlayer kPlayer) {
+        Player player = kPlayer.getBukkitPlayer();
+        if (player != null && !isInCooldown(player.getUniqueId())) {
+            setCooldown(player.getUniqueId());
+
+            // Ajout de Résistance I et de 2 cœurs permanents pendant 20 secondes
+            player.addPotionEffect(new PotionEffect(PotionEffectType.DAMAGE_RESISTANCE, TRANSFORMATION_DURATION, 0, false, false));
+            player.setMaxHealth(player.getMaxHealth() + 4);
+            player.setHealth(Math.min(player.getHealth() + 4, player.getMaxHealth()));
+
+            // Fin de la Forme Défensive après 20 secondes
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    player.setMaxHealth(player.getMaxHealth() - 4); // Retire les cœurs permanents
+                    player.removePotionEffect(PotionEffectType.DAMAGE_RESISTANCE); // Retire l'effet de Résistance
+                }
+            }.runTaskLater(ArenaAPI.getInstance(), TRANSFORMATION_DURATION);
+        } else {
+            player.sendMessage("§cVous êtes en cooldown pour encore " + getRemainingCooldown(player.getUniqueId()) + " secondes.");
+        }
+    }
+
+    // Forme d'Attaque
+    public void activateAttackForm(KPlayer kPlayer) {
+        Player player = kPlayer.getBukkitPlayer();
+        if (player != null && !isInCooldown(player.getUniqueId())) {
+            setCooldown(player.getUniqueId());
+
+            // Ajout de Force I pendant 20 secondes
+            player.addPotionEffect(new PotionEffect(PotionEffectType.INCREASE_DAMAGE, TRANSFORMATION_DURATION, 0, false, false));
+
+            // Paralysie des joueurs à proximité pendant 5 secondes
+            Bukkit.getOnlinePlayers().stream().filter(target -> target.getWorld().getName().equals(player.getWorld().getName()))
+                    .filter(target -> target.getLocation().distance(player.getLocation()) < 10)
+                    .filter(target -> target != player)
+                    .forEach(target -> target.addPotionEffect(new PotionEffect(PotionEffectType.SLOW, 5 * 20, 20, false, false)));
+
+            // Fin de la Forme d'Attaque après 20 secondes
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    player.removePotionEffect(PotionEffectType.INCREASE_DAMAGE); // Retire l'effet de Force
+                }
+            }.runTaskLater(ArenaAPI.getInstance(), TRANSFORMATION_DURATION);
+        } else {
+            player.sendMessage("§cVous êtes en cooldown pour encore " + getRemainingCooldown(player.getUniqueId()) + " secondes.");
+        }
+    }
+
+    // Gestion des cooldowns
+    private void setCooldown(UUID playerId) {
+        cooldowns.put(playerId, System.currentTimeMillis() + (COOLDOWN_DURATION * 1000));
+    }
+
+    private boolean isInCooldown(UUID playerId) {
+        return cooldowns.containsKey(playerId) && cooldowns.get(playerId) > System.currentTimeMillis();
+    }
+
+    private long getRemainingCooldown(UUID playerId) {
+        return (cooldowns.get(playerId) - System.currentTimeMillis()) / 1000;
+    }
+}

@@ -1,0 +1,94 @@
+package fr.ariloxe.arena.kits.release;
+
+import fr.ariloxe.arena.ArenaAPI;
+import fr.ariloxe.arena.kits.KitSchedule;
+import fr.ariloxe.arena.kits.KitType;
+import fr.ariloxe.arena.player.KPlayer;
+import fr.ariloxe.arena.utils.ItemCreator;
+import org.bukkit.Material;
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scheduler.BukkitRunnable;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+public class OursKit extends KitSchedule {
+
+    private static final int FORCE_DURATION = 15 * 20; // 15 secondes de Force
+    private static final int SACRIFICE_COOLDOWN = 35; // Cooldown de 35 secondes
+    private static final int REGEN_INTERVAL = 5 * 20; // 5 secondes pour la régénération naturelle
+
+    private final Map<UUID, Long> cooldowns = new HashMap<>();
+    private final ArenaAPI arenaAPI; // Instance d’ArenaAPI
+
+    public OursKit() { // Prend ArenaAPI en paramètre
+        super("Ours", KitType.TANK, new ItemStack(Material.STICK),
+                "§8» §7Mode : §bElityBox §7(§fHommage§7)",
+                "§8» §7Pouvoirs:",
+                "§f- §7Utilisez l'item Sacrifice pour obtenir Force I pendant 15 secondes.",
+                "§f- §7Cooldown de 35 secondes entre chaque utilisation.",
+                "§f- §7Résistance permanente et régénération d'un cœur toutes les 5 secondes.");
+        this.arenaAPI = arenaAPI; // Assigne l'instance de ArenaAPI
+    }
+
+    @Override
+    public void onEquip(Player player) {
+        player.getInventory().addItem(
+                new ItemCreator(Material.STICK)
+                        .name("§6Sacrifice §8§l▪ §7Clic-droit pour activer")
+                        .get()
+        );
+
+        player.addPotionEffect(new PotionEffect(PotionEffectType.DAMAGE_RESISTANCE, Integer.MAX_VALUE, 0, false, false));
+        player.getInventory().getArmorContents()[0].addEnchantment(Enchantment.THORNS, 2);
+        startNaturalRegen(player);
+    }
+
+    public void activateSacrifice(KPlayer kPlayer) {
+        Player player = kPlayer.getBukkitPlayer();
+        if (player != null && !isInCooldown(player.getUniqueId())) {
+            setCooldown(player.getUniqueId());
+            player.addPotionEffect(new PotionEffect(PotionEffectType.INCREASE_DAMAGE, FORCE_DURATION, 0, false, false));
+            player.sendMessage("§aVous avez activé §6Sacrifice§a et obtenu §cForce I§a pour 15 secondes !");
+        } else {
+            player.sendMessage("§cSacrifice est en cooldown pour encore " + getRemainingCooldown(player.getUniqueId()) + " secondes.");
+        }
+    }
+
+    private void setCooldown(UUID playerId) {
+        cooldowns.put(playerId, System.currentTimeMillis() + (SACRIFICE_COOLDOWN * 1000));
+    }
+
+    private boolean isInCooldown(UUID playerId) {
+        return cooldowns.containsKey(playerId) && cooldowns.get(playerId) > System.currentTimeMillis();
+    }
+
+    private long getRemainingCooldown(UUID playerId) {
+        return (cooldowns.get(playerId) - System.currentTimeMillis()) / 1000;
+    }
+
+    private void startNaturalRegen(Player player) {
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!player.isOnline() || !isPlayerUsingOursKit(player)) {
+                    this.cancel();
+                    return;
+                }
+
+                if (player.getHealth() < player.getMaxHealth()) {
+                    player.setHealth(Math.min(player.getMaxHealth(), player.getHealth() + 2));
+                }
+            }
+        }.runTaskTimer(arenaAPI, 0, REGEN_INTERVAL);
+    }
+
+    private boolean isPlayerUsingOursKit(Player player) {
+        return arenaAPI.getKitManager().getPlayerKit(player) instanceof OursKit;
+    }
+}

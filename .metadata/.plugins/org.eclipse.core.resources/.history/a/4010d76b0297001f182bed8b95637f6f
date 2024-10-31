@@ -1,0 +1,88 @@
+package fr.ariloxe.arena.kits.release;
+
+import fr.ariloxe.arena.kits.KitSchedule;
+import fr.ariloxe.arena.kits.KitType;
+import fr.ariloxe.arena.player.KPlayer;
+import fr.ariloxe.arena.utils.ItemCreator;
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scheduler.BukkitRunnable;
+import fr.ariloxe.arena.ArenaAPI;
+
+public class ErenKit extends KitSchedule {
+
+    private final PotionEffect resistanceEffect = new PotionEffect(PotionEffectType.DAMAGE_RESISTANCE, 20 * 20, 0, false, false);
+    private final PotionEffect forceEffect = new PotionEffect(PotionEffectType.INCREASE_DAMAGE, 20 * 20, 0, false, false);
+    private final PotionEffect paralysisEffect = new PotionEffect(PotionEffectType.SLOW, 5 * 20, 200, false, false);
+    private boolean inTransformation = false;
+
+    public ErenKit() {
+        super("Eren Jeager", KitType.DPS, new ItemStack(Material.DEAD_BUSH),
+                "§8» §7Mode : §eAOTv3",
+                "§8» §7Pouvoirs:",
+                "§f- §7Forme Défensive : Résistance 1 pendant 20s + 2 coeurs temporaires.",
+                "§f- §7Forme Offensive : Force 1 pendant 20s, paralyse les joueurs proches pendant 5s.",
+                "§f- §7Les transformations partagent un cooldown de 45s.");
+
+        super.setSecondsDelay(45);
+    }
+
+    @Override
+    public void power(KPlayer kPlayer) {
+        Player player = kPlayer.getBukkitPlayer();
+        if (player != null) {
+            if (!inTransformation) {
+                inTransformation = true;
+                
+                // Vérification si on entre bien dans la méthode
+                player.sendMessage("§aVous avez reçu les items de transformation.");
+
+                // Création des items de transformation
+                ItemStack defensiveForm = new ItemCreator(Material.IRON_DOOR).name("§aForme Défensive §8§l▪ §7Clic-droit").get();
+                ItemStack offensiveForm = new ItemCreator(Material.IRON_SWORD).name("§aForme Offensive §8§l▪ §7Clic-droit").get();
+
+                // Ajout dans l'inventaire
+                player.getInventory().addItem(defensiveForm);
+                player.getInventory().addItem(offensiveForm);
+            } else {
+                player.sendMessage("§cVous êtes déjà en transformation.");
+            }
+        }
+    }
+
+    public void activateDefensiveForm(Player player) {
+        player.addPotionEffect(resistanceEffect);
+        player.setHealth(Math.min(player.getHealth() + 4, player.getMaxHealth()));  // Soigne de 2 coeurs
+        new TransformationEndTask(player).runTaskLater(ArenaAPI.getApi(), 20 * 20); // 20s
+    }
+
+    public void activateOffensiveForm(Player player) {
+        player.addPotionEffect(forceEffect);
+        Bukkit.getOnlinePlayers().stream()
+                .filter(target -> target != player && target.getLocation().distance(player.getLocation()) <= 10)
+                .forEach(target -> target.addPotionEffect(paralysisEffect));
+        new TransformationEndTask(player).runTaskLater(ArenaAPI.getApi(), 20 * 20); // 20s
+    }
+
+    private class TransformationEndTask extends BukkitRunnable {
+        private final Player player;
+
+        public TransformationEndTask(Player player) {
+            this.player = player;
+        }
+
+        @Override
+        public void run() {
+            inTransformation = false;
+            player.removePotionEffect(PotionEffectType.DAMAGE_RESISTANCE);
+            player.removePotionEffect(PotionEffectType.INCREASE_DAMAGE);
+            player.getInventory().remove(Material.IRON_DOOR);
+            player.getInventory().remove(Material.IRON_SWORD);
+            player.sendMessage("§cVous vous détransformez !");
+        }
+    }
+}

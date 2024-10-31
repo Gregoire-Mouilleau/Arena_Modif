@@ -1,0 +1,70 @@
+package fr.ariloxe.arena.kits.release;
+
+import fr.ariloxe.arena.ArenaAPI;
+import fr.ariloxe.arena.kits.KitSchedule;
+import fr.ariloxe.arena.kits.KitType;
+import fr.ariloxe.arena.player.KPlayer;
+import fr.ariloxe.arena.utils.ItemCreator;
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scheduler.BukkitRunnable;
+
+/**
+ * Kit "Ours" avec activation de Force et régénération temporaire, puis retour à Résistance avec perte d'un cœur permanent.
+ */
+public class OursKit extends KitSchedule {
+
+    public OursKit() {
+        super("Ours", KitType.TANK, new ItemStack(Material.STICK),
+                "§8» §7Mode : §bElityBox §7(§fHommage§7)",
+                "§8» §7Pouvoirs:",
+                "§f- §7Activez l'effet de Force pendant 20 secondes en sacrifiant votre Résistance.",
+                "§f- §7Pendant ces 20s, régénérez 1 cœur toutes les 5 secondes,",
+                "    §7mais perdez 1 cœur permanent à la fin (§a60s de cooldown§7).");
+        super.setSecondsDelay(60);
+    }
+
+    private final PotionEffect resistanceEffect = new PotionEffect(PotionEffectType.DAMAGE_RESISTANCE, Integer.MAX_VALUE, 0, false, false);
+    private final PotionEffect forceEffect = new PotionEffect(PotionEffectType.INCREASE_DAMAGE, 20 * 20, 0, false, false);
+
+    @Override
+    public void power(KPlayer kPlayer) {
+        Player player = kPlayer.getBukkitPlayer();
+        if (player != null) {
+            player.removePotionEffect(PotionEffectType.DAMAGE_RESISTANCE);
+            player.addPotionEffect(forceEffect);
+
+            new BukkitRunnable() {
+                private int ticks = 20 * 20;  // Durée de 20 secondes en ticks
+
+                @Override
+                public void run() {
+                    if (ticks <= 0) {
+                        player.addPotionEffect(resistanceEffect); // Récupération de Résistance
+                        if (player.getMaxHealth() > 2) {
+                            player.setMaxHealth(player.getMaxHealth() - 2); // Perte d'1 cœur
+                        }
+                        cancel();
+                        return;
+                    }
+                    if (ticks % 100 == 0 && player.getHealth() < player.getMaxHealth()) {
+                        player.setHealth(Math.min(player.getHealth() + 2, player.getMaxHealth())); // Régénération de 1 cœur
+                    }
+                    ticks -= 5;
+                }
+            }.runTaskTimer(ArenaAPI.getApi(), 0L, 5L); // Exécute toutes les 5 ticks
+        }
+    }
+
+    @Override
+    public void onEquip(Player player) {
+        player.setMaxHealth(20); // Remet les cœurs à 10
+        player.setHealth(player.getMaxHealth());
+        player.addPotionEffect(resistanceEffect);
+
+        player.getInventory().addItem(new ItemCreator(Material.STICK).name("§6Rage de l'Ours §8§l▪ §7Clic-droit").get());
+    }
+}
